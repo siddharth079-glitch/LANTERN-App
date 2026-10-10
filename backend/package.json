@@ -1,0 +1,12 @@
+{
+  "name": "lantern-backend",
+  "version": "1.0.0",
+  "description": "LANTERN Disaster-Response Central Backend & Rescue Operations Service",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LANTERN — Central Rescue Operations & Dispatch Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <style>
+    :root {
+      --bg-dark: #080D1A;
+      --bg-surface: #0F172A;
+      --bg-surface-elevated: #162238;
+      --bg-card: rgba(22, 34, 56, 0.75);
+      --border-subtle: rgba(255, 255, 255, 0.1);
+      --border-glow: rgba(230, 57, 70, 0.4);
+      --primary-red: #E63946;
+      --primary-red-glow: rgba(230, 57, 70, 0.35);
+      --accent-crimson: #D90429;
+      --accent-orange: #F77F00;
+      --accent-yellow: #FCBF49;
+      --accent-green: #06D6A0;
+      --accent-blue: #3A86FF;
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Command Header */
+    header {
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #D90429, #E63946);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px var(--primary-red-glow);
+    }
+
+    .brand-logo svg {
+      width: 24px;
+      height: 24px;
+      fill: #fff;
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-tag {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(230, 57, 70, 0.2);
+      color: var(--primary-red);
+      border: 1px solid var(--border-glow);
+      letter-spacing: 0.5px;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(6, 214, 160, 0.1);
+      border: 1px solid rgba(6, 214, 160, 0.3);
+      color: var(--accent-green);
+    }
+
+    .status-badge.disconnected {
+      background: rgba(230, 57, 70, 0.1);
+      border-color: rgba(230, 57, 70, 0.3);
+      color: var(--primary-red);
+    }
+
+    .status-pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: currentColor;
+      box-shadow: 0 0 8px currentColor;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.2); }
+    }
+
+    .audio-toggle-btn {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .audio-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* KPI Bar */
+    .kpi-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      padding: 16px 24px;
+      background: rgba(10, 16, 28, 0.8);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 14px 18px;
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .kpi-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .kpi-value {
+      font-size: 1.7rem;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      color: #fff;
+    }
+
+    .kpi-card.critical .kpi-value {
+      color: var(--primary-red);
+      text-shadow: 0 0 12px var(--primary-red-glow);
+    }
+
+    .kpi-card.responders .kpi-value {
+      color: var(--accent-blue);
+    }
+
+    .kpi-card.shelters .kpi-value {
+      color: var(--accent-green);
+    }
+
+    /* Operations Dashboard Layout */
+    .main-workspace {
+      display: grid;
+      grid-template-columns: 1fr 480px;
+      gap: 16px;
+      padding: 16px 24px;
+      flex: 1;
+      height: calc(100vh - 150px);
+    }
+
+    @media (max-width: 1024px) {
+      .main-workspace {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+    }
+
+    /* Left Area: Tactical Map & Shelters */
+    .map-container-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100%;
+    }
+
+    .map-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .map-header h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #tacticalMap {
+      flex: 1;
+      min-height: 480px;
+      border-radius: 14px;
+      border: 1px solid var(--border-subtle);
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Custom Leaflet Dark Mode styling */
+    .leaflet-tile {
+      filter: brightness(0.7) invert(1) contrast(3) hue-rotate(200deg) saturate(0.35);
+    }
+
+    /* Right Area: Live Triage Feed */
+    .feed-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    .feed-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--bg-surface-elevated);
+    }
+
+    .feed-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .feed-title-row h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .feed-badge {
+      background: var(--primary-red);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .filter-tab {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .filter-tab.active, .filter-tab:hover {
+      background: var(--primary-red);
+      color: #fff;
+      border-color: var(--primary-red);
+    }
+
+    .feed-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Incident Card */
+    .incident-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .incident-card.critical {
+      border-left: 4px solid var(--primary-red);
+      box-shadow: 0 4px 16px rgba(230, 57, 70, 0.15);
+    }
+
+    .incident-card.high {
+      border-left: 4px solid var(--accent-orange);
+    }
+
+    .incident-card.medium {
+      border-left: 4px solid var(--accent-yellow);
+    }
+
+    .incident-card.resolved {
+      border-left: 4px solid var(--accent-green);
+      opacity: 0.75;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .card-id-time {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .incident-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .incident-time {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    .priority-pill {
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .priority-pill.critical {
+      background: rgba(230, 57, 70, 0.2);
+      color: var(--primary-red);
+      border: 1px solid var(--primary-red);
+    }
+
+    .priority-pill.high {
+      background: rgba(247, 127, 0, 0.2);
+      color: var(--accent-orange);
+      border: 1px solid var(--accent-orange);
+    }
+
+    .priority-pill.medium {
+      background: rgba(252, 191, 73, 0.2);
+      color: var(--accent-yellow);
+      border: 1px solid var(--accent-yellow);
+    }
+
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .meta-tag {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-muted);
+    }
+
+    .meta-tag.status-received {
+      background: rgba(58, 134, 255, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid rgba(58, 134, 255, 0.3);
+    }
+
+    .meta-tag.status-acknowledged {
+      background: rgba(247, 127, 0, 0.15);
+      color: var(--accent-orange);
+      border: 1px solid rgba(247, 127, 0, 0.3);
+    }
+
+    .meta-tag.status-assigned {
+      background: rgba(131, 56, 236, 0.2);
+      color: #B580FF;
+      border: 1px solid rgba(131, 56, 236, 0.4);
+    }
+
+    .meta-tag.status-resolved {
+      background: rgba(6, 214, 160, 0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(6, 214, 160, 0.3);
+    }
+
+    .card-description {
+      font-size: 0.8rem;
+      color: var(--text-main);
+      line-height: 1.4;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 8px 10px;
+      border-radius: 6px;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .btn-action {
+      flex: 1;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn-ack {
+      background: var(--accent-orange);
+      color: #000;
+    }
+
+    .btn-ack:hover {
+      background: #FFA033;
+    }
+
+    .btn-assign {
+      background: var(--accent-blue);
+      color: #fff;
+    }
+
+    .btn-assign:hover {
+      background: #5CA0FF;
+    }
+
+    .btn-resolve {
+      background: var(--accent-green);
+      color: #000;
+    }
+
+    .btn-resolve:hover {
+      background: #33F5BF;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 520px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .form-select, .form-input {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Command Header -->
+  <header>
+    <div class="brand-section">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L4 7v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V7l-8-5zm0 10.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">LANTERN <span class="brand-tag">CENTRAL DISPATCH</span></div>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <button class="audio-toggle-btn" id="audioToggleBtn" onclick="toggleAudioAlerts()">
+        <span id="audioIcon">🔔</span> Audio Alerts: <span id="audioState">ON</span>
+      </button>
+      <div class="status-badge" id="wsStatusBadge">
+        <div class="status-pulse"></div>
+        <span id="wsStatusText">CONNECTING...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- KPI Stats Bar -->
+  <section class="kpi-bar">
+    <div class="kpi-card critical">
+      <span class="kpi-title">Active SOS Beacons</span>
+      <span class="kpi-value" id="kpiActiveSos">0</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-title">Critical Priority</span>
+      <span class="kpi-value" id="kpiCritical">0</span>
+    </div>
+    <div class="kpi-card responders">
+      <span class="kpi-title">Dispatched Responders</span>
+      <span class="kpi-value" id="kpiDispatched">0</span>
+    </div>
+    <div class="kpi-card shelters">
+      <span class="kpi-title">Safe Shelters Operational</span>
+      <span class="kpi-value" id="kpiShelters">4</span>
+    </div>
+  </section>
+
+  <!-- Main Workspace -->
+  <main class="main-workspace">
+    <!-- Map Section -->
+    <div class="map-container-wrap">
+      <div class="map-header">
+        <h2>Tactical GIS Map & Incident Pins</h2>
+        <span style="font-size: 0.75rem; color: var(--text-dim);">Live OpenStreetMap & Real Incident Telemetry</span>
+      </div>
+      <div id="tacticalMap"></div>
+    </div>
+
+    <!-- Live Incident Stream -->
+    <div class="feed-panel">
+      <div class="feed-header">
+        <div class="feed-title-row">
+          <h2>Live Emergency Feed</h2>
+          <span class="feed-badge" id="feedCountBadge">0 Active</span>
+        </div>
+        <div class="filter-tabs">
+          <button class="filter-tab active" onclick="setFilter('ALL', this)">All</button>
+          <button class="filter-tab" onclick="setFilter('CRITICAL', this)">Critical</button>
+          <button class="filter-tab" onclick="setFilter('HIGH', this)">High</button>
+          <button class="filter-tab" onclick="setFilter('ASSIGNED', this)">Assigned</button>
+          <button class="filter-tab" onclick="setFilter('RESOLVED', this)">Resolved</button>
+        </div>
+      </div>
+
+      <div class="feed-list" id="incidentList">
+        <!-- Incidents rendered here -->
+      </div>
+    </div>
+  </main>
+
+  <!-- Dispatch Modal -->
+  <div class="modal-backdrop" id="dispatchModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">Dispatch Rescue Unit</div>
+        <button class="modal-close" onclick="closeDispatchModal()">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target Incident</label>
+        <input class="form-input" id="modalIncidentId" readonly />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Select Responder Unit</label>
+        <select class="form-select" id="modalResponderSelect">
+          <!-- Filled dynamically -->
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Estimated ETA (Minutes)</label>
+        <input class="form-input" id="modalEta" type="number" value="10" min="1" max="120" />
+      </div>
+      <div class="modal-actions">
+        <button class="filter-tab" onclick="closeDispatchModal()">Cancel</button>
+        <button class="btn-action btn-assign" onclick="confirmDispatch()">Confirm Dispatch</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    let map;
+    let markers = {};
+    let incidents = [];
+    let currentFilter = 'ALL';
+    let audioAlertsEnabled = true;
+    let audioCtx = null;
+    let respondersList = [];
+
+    // Initialize Leaflet Tactical Map
+    function initMap() {
+      // Centered on default area (17.3850, 78.4867)
+      map = L.map('tacticalMap', {
+        zoomControl: true,
+        attributionControl: true
+      }).setView([17.3850, 78.4867], 13);
+
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+
+      loadSheltersOnMap();
+    }
+
+    // Play tactile synthesized audio alert
+    function playAlertChime() {
+      if (!audioAlertsEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+        osc.frequency.setValueAtTime(1174.66, audioCtx.currentTime + 0.15); // D6
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+      } catch (e) {
+        console.warn('Audio alert prevented by browser policy:', e);
+      }
+    }
+
+    function toggleAudioAlerts() {
+      audioAlertsEnabled = !audioAlertsEnabled;
+      document.getElementById('audioState').textContent = audioAlertsEnabled ? 'ON' : 'OFF';
+      document.getElementById('audioIcon').textContent = audioAlertsEnabled ? '🔔' : '🔕';
+    }
+
+    // Load shelters on map
+    async function loadSheltersOnMap() {
+      try {
+        const res = await fetch('/v1/shelters');
+        const data = await res.json();
+        document.getElementById('kpiShelters').textContent = data.count || 4;
+
+        for (const shelter of (data.shelters || [])) {
+          const icon = L.divIcon({
+            className: 'shelter-marker-icon',
+            html: `<div style="background:#06D6A0; color:#000; font-weight:800; font-size:11px; padding:4px 8px; border-radius:6px; border:2px solid #fff; box-shadow:0 0 10px rgba(6,214,160,0.6); white-space:nowrap;">🏥 ${shelter.name}</div>`,
+            iconSize: [120, 24]
+          });
+          L.marker([shelter.latitude, shelter.longitude], { icon }).addTo(map)
+            .bindPopup(`<b>${shelter.name}</b><br>Type: ${shelter.type}<br>Capacity: ${shelter.current_occupancy}/${shelter.capacity}<br>Contact: ${shelter.contact_phone}`);
+        }
+      } catch (err) {
+        console.error('Failed to load shelters:', err);
+      }
+    }
+
+    // Load available responders
+    async function loadResponders() {
+      try {
+        const res = await fetch('/v1/responders');
+        const data = await res.json();
+        respondersList = data.responders || [];
+        const select = document.getElementById('modalResponderSelect');
+        select.innerHTML = respondersList.map(r => `
+          <option value="${r.responder_id}">${r.name} (${r.unit} • ${r.vehicle_id})</option>
+        `).join('');
+      } catch (err) {
+        console.error('Failed to load responders:', err);
+      }
+    }
+
+    // Fetch and render incidents
+    async function fetchIncidents() {
+      try {
+        const res = await fetch('/v1/incidents');
+        const data = await res.json();
+        incidents = data.incidents || [];
+        renderIncidents();
+        updateMapMarkers();
+        updateKPIs();
+      } catch (err) {
+        console.error('Error fetching incidents:', err);
+      }
+    }
+
+    function setFilter(filter, btn) {
+      currentFilter = filter;
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      renderIncidents();
+    }
+
+    function renderIncidents() {
+      const container = document.getElementById('incidentList');
+      const filtered = incidents.filter(i => {
+        if (currentFilter === 'ALL') return true;
+        if (currentFilter === 'CRITICAL') return i.priority === 'CRITICAL';
+        if (currentFilter === 'HIGH') return i.priority === 'HIGH';
+        if (currentFilter === 'ASSIGNED') return i.status === 'ASSIGNED';
+        if (currentFilter === 'RESOLVED') return i.status === 'RESOLVED';
+        return true;
+      });
+
+      document.getElementById('feedCountBadge').textContent = `${filtered.length} Active`;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding:32px; color:var(--text-dim); font-size:0.85rem;">No incidents found in this category.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(i => {
+        const sevClass = (i.priority || 'MEDIUM').toLowerCase();
+        const statusClass = (i.status || 'SERVER_RECEIVED').toLowerCase().replace('_', '-');
+        const coordsText = (i.latitude && i.longitude) 
+          ? `📍 ${i.latitude.toFixed(4)}, ${i.longitude.toFixed(4)} (±${Math.round(i.accuracy_meters || 10)}m)`
+          : `📍 Coordinates Unavailable (Explicit Null)`;
+
+        return `
+          <div class="incident-card ${sevClass}" id="card-${i.incident_id}">
+            <div class="card-top">
+              <div class="card-id-time">
+                <span class="incident-id">${i.incident_id}</span>
+                <span class="incident-time">${new Date(i.created_at).toLocaleTimeString()} • ${i.emergency_type.replace('_', ' ').toUpperCase()}</span>
+              </div>
+              <span class="priority-pill ${sevClass}">${i.priority} (${i.priority_score} PTS)</span>
+            </div>
+
+            <div class="card-meta">
+              <span class="meta-tag status-${statusClass}">${i.status}</span>
+              <span class="meta-tag">${coordsText}</span>
+              ${i.is_relayed ? `
+                <span class="meta-tag" style="background:rgba(247,127,0,0.22); color:#F77F00; border:1px solid rgba(247,127,0,0.45); font-weight:700;">⚡ RELAYED VIA PEER (${i.relayed_by || 'Nearby Node'} • ${i.relay_hops || 1} Hop)</span>
+              ` : `
+                <span class="meta-tag" style="background:rgba(6,214,160,0.12); color:#06D6A0; border:1px solid rgba(6,214,160,0.3);">🌐 DIRECT GATEWAY</span>
+              `}
+              ${i.responder_name ? `<span class="meta-tag" style="background:rgba(131,56,236,0.2); color:#B580FF;">🚑 ${i.responder_name} (${i.vehicle_id})</span>` : ''}
+            </div>
+
+            <div class="card-description">${i.description || 'Emergency distress beacon activated by survivor.'}</div>
+
+            <div class="card-actions">
+              ${i.status === 'SERVER_RECEIVED' ? `
+                <button class="btn-action btn-ack" onclick="acknowledgeIncident('${i.incident_id}')">Acknowledge</button>
+              ` : ''}
+              ${i.status !== 'RESOLVED' ? `
+                <button class="btn-action btn-assign" onclick="openDispatchModal('${i.incident_id}')">Dispatch Unit</button>
+                <button class="btn-action btn-resolve" onclick="resolveIncident('${i.incident_id}')">Resolve</button>
+              ` : `
+                <span style="font-size:0.75rem; color:var(--accent-green); font-weight:700;">✓ RESCUE COMPLETED</span>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateMapMarkers() {
+      // Remove old markers
+      for (const id in markers) {
+        map.removeLayer(markers[id]);
+      }
+      markers = {};
+
+      for (const i of incidents) {
+        if (!i.latitude || !i.longitude) continue;
+
+        const isCritical = i.priority === 'CRITICAL';
+        const color = isCritical ? '#E63946' : (i.priority === 'HIGH' ? '#F77F00' : '#FCBF49');
+        
+        const customIcon = L.divIcon({
+          className: 'incident-marker-pulse',
+          html: `
+            <div style="background:${color}; width:16px; height:16px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 12px ${color}; display:flex; align-items:center; justify-content:center;">
+            </div>
+          `,
+          iconSize: [16, 16]
+        });
+
+        const marker = L.marker([i.latitude, i.longitude], { icon: customIcon }).addTo(map);
+        marker.bindPopup(`
+          <div style="font-family:Inter,sans-serif; min-width:180px;">
+            <b style="color:${color};">${i.incident_id}</b><br>
+            <b>Type:</b> ${i.emergency_type}<br>
+            <b>Status:</b> ${i.status}<br>
+            <b>Priority:</b> ${i.priority} (${i.priority_score} pts)<br>
+            <p style="margin:6px 0; font-size:12px;">${i.description || 'SOS distress signal'}</p>
+            <button onclick="openDispatchModal('${i.incident_id}')" style="background:#3A86FF; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-weight:bold; cursor:pointer; width:100%;">Dispatch Unit</button>
+          </div>
+        `);
+        markers[i.incident_id] = marker;
+      }
+    }
+
+    function updateKPIs() {
+      const active = incidents.filter(i => i.status !== 'RESOLVED' && i.status !== 'CANCELLED');
+      const critical = active.filter(i => i.priority === 'CRITICAL');
+      const dispatched = incidents.filter(i => i.status === 'ASSIGNED');
+
+      document.getElementById('kpiActiveSos').textContent = active.length;
+      document.getElementById('kpiCritical').textContent = critical.length;
+      document.getElementById('kpiDispatched').textContent = dispatched.length;
+    }
+
+    // Action Handlers
+    async function acknowledgeIncident(id) {
+      try {
+        const res = await fetch(`/v1/incidents/${id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'ACKNOWLEDGED', actor: 'COMMAND_DISPATCHER', reason: 'Beacon acknowledged by Central Operations' })
+        });
+        if (res.ok) fetchIncidents();
+      } catch (e) {
+        console.error('Ack failed:', e);
+      }
+    }
+
+    async function resolveIncident(id) {
+      if (!confirm(`Mark emergency incident ${id} as fully resolved?`)) return;
+      try {
+        const res = await fetch(`/v1/incidents/${id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'RESOLVED', actor: 'COMMAND_DISPATCHER', reason: 'Survivors secured and transported to safe shelter.' })
+        });
+        if (res.ok) fetchIncidents();
+      } catch (e) {
+        console.error('Resolve failed:', e);
+      }
+    }
+
+    let selectedIncidentForDispatch = null;
+    function openDispatchModal(id) {
+      selectedIncidentForDispatch = id;
+      document.getElementById('modalIncidentId').value = id;
+      document.getElementById('dispatchModal').classList.add('open');
+    }
+
+    function closeDispatchModal() {
+      document.getElementById('dispatchModal').classList.remove('open');
+      selectedIncidentForDispatch = null;
+    }
+
+    async function confirmDispatch() {
+      if (!selectedIncidentForDispatch) return;
+      const responderId = document.getElementById('modalResponderSelect').value;
+      const eta = document.getElementById('modalEta').value;
+
+      try {
+        const res = await fetch(`/v1/incidents/${selectedIncidentForDispatch}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ responder_id: responderId, etaMinutes: parseInt(eta, 10) })
+        });
+        if (res.ok) {
+          closeDispatchModal();
+          fetchIncidents();
+        }
+      } catch (e) {
+        console.error('Dispatch failed:', e);
+      }
+    }
+
+    // Connect Real-Time WebSocket
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const ws = new WebSocket(wsUrl);
+
+      const statusBadge = document.getElementById('wsStatusBadge');
+      const statusText = document.getElementById('wsStatusText');
+
+      ws.onopen = () => {
+        statusBadge.classList.remove('disconnected');
+        statusText.textContent = 'LIVE WS CONNECTED';
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'INCIDENT_CREATED') {
+            playAlertChime();
+            fetchIncidents();
+          } else if (data.type === 'INCIDENT_STATUS_CHANGED' || data.type === 'INCIDENT_ASSIGNED') {
+            fetchIncidents();
+          }
+        } catch (e) {
+          console.error('WS parse error:', e);
+        }
+      };
+
+      ws.onclose = () => {
+        statusBadge.classList.add('disconnected');
+        statusText.textContent = 'DISCONNECTED (RETRYING)';
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+    }
+
+    // Bootstrap
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      loadResponders();
+      fetchIncidents();
+      connectWebSocket();
+    });
+  </script>
+</body>
+</html>
